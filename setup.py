@@ -18,7 +18,7 @@ def get_readme():
 
 setup(
     name='eyap',
-    version='0.3.0',
+    version='0.3.1',
     description='Tools for extending yapping and comment management',
     long_description=get_readme(),
     url='http://github.com/emin63/eyap',
@@ -34,7 +34,7 @@ setup(
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
-    install_requires=['requests', 'dateutil'],
+    install_requires=['requests', 'python-dateutil'],
     # If there are data files included in your packages that need to be
     # installed, specify them here.
     package_data={
