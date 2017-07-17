@@ -8,17 +8,19 @@ or write to emin.martinian@gmail.com for more information.
 from setuptools import setup, find_packages
 from os import path
 
-here = path.abspath(path.dirname(__file__))
+def get_readme():
+    'Get the long description from the README file'
 
-# Get the long description from the README file
-with open(path.join(here, 'README.md'), encoding='utf-8') as f:
-    long_description = f.read()
+    here = path.abspath(path.dirname(__file__))
+    with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+        result = f.read()
+    return result
 
 setup(
     name='eyap',
-    version='0.1.0',
+    version='0.1.1',
     description='Tools for extending yapping and comment management',
-    long_description=long_description,
+    long_description=get_readme(),
     url='http://github.com/emin63/eyap',
     author='Emin Martinian',
     author_email='emin.martinian@gmail.com',
