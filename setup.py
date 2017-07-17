@@ -18,7 +18,7 @@ def get_readme():
 
 setup(
     name='eyap',
-    version='0.2.0',
+    version='0.3.0',
     description='Tools for extending yapping and comment management',
     long_description=get_readme(),
     url='http://github.com/emin63/eyap',
