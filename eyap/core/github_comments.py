@@ -38,7 +38,8 @@ class GitHubCommentGroup(object):
     """Class to represent a group of github comments.
     """
 
-    def __init__(self, owner, realm, topic_re, user, token, max_threads=None):
+    def __init__(self, owner, realm, topic_re,
+                 user=None, token=None, max_threads=None):
         """Initializer.
 
         :arg owner:    String owner (e.g., the repository owner if using
@@ -162,7 +163,7 @@ class GitHubCommentThread(comments.CommentThread):
         in init.
         """
 
-        query_string = '%s?q=in:title+%s+repo:%s/%s' % (
+        query_string = '%s?q=in:title+%%3A%s%%3A+repo:%s/%s' % (
             self.search_url, self.topic, self.owner, self.realm)
         kwargs = {} if not self.user else {'auth': (
             self.user, self.token)}
@@ -251,6 +252,8 @@ class GitHubCommentThread(comments.CommentThread):
         return issue_json, comments_json
 
     def lookup_comments(self, reverse=False):
+        if self.thread_id is None:
+            self.thread_id = self.lookup_thread_id()
         issue_json, comment_json = self.lookup_comment_list()
         if issue_json is None and comment_json is None:
             return comments.CommentSection([])

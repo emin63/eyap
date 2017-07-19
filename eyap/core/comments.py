@@ -80,11 +80,18 @@ class SingleComment(object):
         my_stamp = dateutil.parser.parse(self.timestamp)
         self.display_timestamp = my_stamp.astimezone(mytz).strftime(fmt)
 
+    def __str__(self):
+        return 'Subject: %s\nTimestamp: %s\n%s\n%s' % (
+            self.summary, self.display_timestamp, '-'*10, self.body)
+
 class CommentSection(object):
     """Class to represent a section, thread or other collection of comments.
 
-    Currently, this is very simple: self.comments is a sequence of SingleComment
-    instances.
+    A CommentSection has the following useful features:
+
+       self.comments:  Sequence of SingleComment instances with the comments.
+       self.display:   Function to dislay the comments.
+
     """
 
     def __init__(self, comments):
@@ -112,6 +119,12 @@ class CommentSection(object):
         for item in self.comments:
             item.set_display_mode(mytz, fmt)
 
+    def show(self):
+        result = '\n'.join(['%s\n%s' % ('=' * 40, c) for c in self.comments])
+        return result
+
+    def __str__(self):
+        return self.show()
 
 class CommentThread(object):
     """Abstract class used to interact with discussion threads.
@@ -122,7 +135,8 @@ class CommentThread(object):
     database or whatever relatively painlessly.
     """
 
-    def __init__(self, owner, realm, topic, user, token, thread_id=None):
+    def __init__(self, owner, realm, topic,
+                 user=None, token=None, thread_id=None):
         """Initializer.
 
         :arg owner:    String owner (e.g., the repository owner if using
@@ -244,6 +258,23 @@ class CommentThread(object):
 
         return self.content
 
+
+class AttachmentHandler(object):
+
+    def put_file(self, location, data):
+        FIXME
+        url = 'https://api.github.com/repos/aocks/%s/contents/files/%s/%s' % (
+            cap_settings.GITHUB_REPO, prefix, name)
+        auth = creds.get_github_credentials(current_user)
+        result = requests.put(url, auth=auth, data=json.dumps({
+            'message' : description, 'content' : content}))
+        if result.status_code != 201:
+            return render_template(
+                'generic_display.html', title='Unable to upload file',
+                commentary="Can't upload file with name %s due to error %s." % (
+                    name, result.reason))
+
+    
 class FileCommentThread(CommentThread):
     """Example file based comment thread for testing and showing example usage.
 
@@ -283,28 +314,37 @@ class FileCommentThread(CommentThread):
 
         return CommentSection(comments)
 
-    def add_comment(self, body):
+    def add_comment(self, body, allow_create=False):
         "Implement as required by parent to store comment in CSV file."
 
         if self.thread_id is None:
             self.thread_id = self.lookup_thread_id()
         if not os.path.exists(self.thread_id):
-            with open(self.thread_id, 'a') as fdesc:
+            if not allow_create:
+                raise KeyError(self.topic)
+            with open(self.thread_id, 'a', newline='') as fdesc:
                 csv.writer(fdesc).writerow(self.header)
 
-        with open(self.thread_id, 'a') as fdesc:
+        with open(self.thread_id, 'a', newline='') as fdesc:
             writer = csv.writer(fdesc)
             writer.writerow([self.user, datetime.datetime.utcnow(), body, ''])
 
     @staticmethod
     def _regr_tests():
         """
->>> import flask, os, tempfile, shutil
+>>> import os, tempfile, shutil
 >>> from eyap.core import comments
 >>> tempdir = tempfile.mkdtemp()
 >>> owner, realm, topic, user = 'test_owner', tempdir, 'test_topic', 't_user'
 >>> ctest = comments.FileCommentThread(owner, realm, topic, user, None)
->>> ctest.add_comment('testing comment%clots of cool stuff here' % 10)
+>>> ctest.add_comment('testing comment%ccool stuff here' % 10, allow_create=1)
+>>> print(ctest.lookup_comments()) # doctest: +ELLIPSIS
+========================================
+Subject: testing comment ...
+Timestamp: ...
+----------
+testing comment
+cool stuff here
 >>> shutil.rmtree(tempdir)
 >>> os.path.exists(tempdir)
 False
