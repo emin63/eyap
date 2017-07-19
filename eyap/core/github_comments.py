@@ -17,9 +17,14 @@ except ImportError as problem:
         'Could not import markdown package. Will render as plain.',
         'Install the markdown package if you want comments rendered as',
         'markdown.']))
-    markdown = lambda text, *args, **kw: text
+
+    def markdown(text, *args, **kw):
+        "Fake markdown by just return input text"
+        dummy = args, kw
+        return text
 
 from eyap.core import comments, yap_exceptions
+
 
 class GitHubAngry(Exception):
     """Exception to indicate something wrong with github API.
@@ -64,7 +69,7 @@ class GitHubCommentGroup(object):
         my_re = re.compile(self.topic_re)
         url = '%s/issues' % (self.base_url)
         while url:
-            kwargs = {} if not self.user else {'auth' : (
+            kwargs = {} if not self.user else {'auth': (
                 self.user, self.token)}
             my_req = requests.get(url, **kwargs)
             my_json = my_req.json()
@@ -124,10 +129,12 @@ class GitHubCommentGroup(object):
 >>> data = zdata.read(zdata.infolist()[0].filename)
 >>> len(data) > 10
 True
+>>> del zdata
 >>> os.remove(fn)
 >>> os.path.exists(fn)
 False
 """
+
 
 class GitHubCommentThread(comments.CommentThread):
     """Sub-class of CommentThread using GitHub as a back-end.
@@ -135,7 +142,7 @@ class GitHubCommentThread(comments.CommentThread):
 
     # Base url to use in searching for issues.
     search_url = 'https://api.github.com/search/issues'
-    url_extras = '' # useful in testing to add things to URL
+    url_extras = ''  # useful in testing to add things to URL
 
     def __init__(self, *args, **kw):
         """Initializer.
@@ -157,7 +164,7 @@ class GitHubCommentThread(comments.CommentThread):
 
         query_string = '%s?q=in:title+%s+repo:%s/%s' % (
             self.search_url, self.topic, self.owner, self.realm)
-        kwargs = {} if not self.user else {'auth' : (
+        kwargs = {} if not self.user else {'auth': (
             self.user, self.token)}
         my_req = requests.get(query_string, **kwargs)
         if my_req.status_code != 200:
@@ -166,10 +173,10 @@ class GitHubCommentThread(comments.CommentThread):
                     my_req.status_code, self.topic, my_req.reason))
 
         data = my_req.json()
-        if data['total_count'] == 1: # unique match
+        if data['total_count'] == 1:  # unique match
             return data['items'][0]['number']
-        if data['total_count'] > 1: # multiple matches since github doesn't have
-            searched_data = [       # unique search we must filter ourselves
+        if data['total_count'] > 1:  # multiple matches since github doesn't
+            searched_data = [        # have unique search we must filter it
                 item for item in data['items'] if item['title'] == self.topic]
             if len(searched_data) > 1:
                 raise yap_exceptions.UnableToFindUniqueTopic(
@@ -182,12 +189,38 @@ class GitHubCommentThread(comments.CommentThread):
             return None
 
     def raw_pull(self, topic):
-        kwargs = {} if not self.user else {'auth' : (self.user, self.token)}
+        """Do a raw pull of data for given topic down from github.
+
+        :arg topic:    String topic (i.e., issue title).
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        :returns:      Result of request data from github API.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:       Encapsulate call that gets raw data from github.
+
+        """
+        kwargs = {} if not self.user else {'auth': (self.user, self.token)}
         my_req = requests.get('%s/issues/%s' % (
             self.base_url, topic), **kwargs)
         return my_req
 
     def lookup_comment_list(self):
+        """Lookup list of comments for an issue.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        :returns:  The pair (ISSUE, COMMENTS) where ISSUE is a dict for the
+                   main issue and COMMENTS is a list of comments on the issue.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:   Do the work of getting data from github, handling paging,
+                   and so on.
+
+        """
         if self.thread_id is None:
             return None, None
 
@@ -198,7 +231,7 @@ class GitHubCommentThread(comments.CommentThread):
                 my_req.status_code, my_req.reason))
         issue_json = my_req.json()
         comments_url = issue_json['comments_url'] + self.url_extras
-        kwargs = {} if not self.user else {'auth' : (self.user, self.token)}
+        kwargs = {} if not self.user else {'auth': (self.user, self.token)}
         comments_json = []
         while comments_url:
             logging.debug('Pulling comments URL: %s', comments_url)
@@ -207,7 +240,7 @@ class GitHubCommentThread(comments.CommentThread):
             assert isinstance(my_json, list)
             comments_json.extend(my_json)
             comments_url = None
-            if 'link' in c_req.headers: # need to handle pagination.
+            if 'link' in c_req.headers:  # need to handle pagination.
                 logging.debug('Paginating in lookup_comment_list')
                 link = c_req.headers['link'].split(',')
                 for thing in link:
@@ -257,7 +290,7 @@ class GitHubCommentThread(comments.CommentThread):
         """
         if self.thread_id is None:
             self.thread_id = self.lookup_thread_id()
-        data = json.dumps({'body' : body})
+        data = json.dumps({'body': body})
         result = requests.post('%s/issues/%s/comments' % (
             self.base_url, self.thread_id), data, auth=(self.user, self.token))
         if result.status_code != 201:
@@ -271,7 +304,7 @@ class GitHubCommentThread(comments.CommentThread):
         return result
 
     def create_thread(self, body):
-        data = json.dumps({'body' : body, 'title' : self.topic})
+        data = json.dumps({'body': body, 'title': self.topic})
         result = requests.post('%s/issues' % (self.base_url),
                                data, auth=(self.user, self.token))
         if result.status_code != 201:
