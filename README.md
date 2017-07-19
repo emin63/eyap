@@ -6,7 +6,7 @@ comment management system which can be used with various back-ends.
 
 # Quick start
 
-The following example is from [`eyap/__init__.py`](https://github.com/emin63/eyap/blob/master/eyap/__init__.py)
+The following example is from [`eyap/__init__.py`](https://github.com/emin63/eyap/blob/master/eyap/__init__.py):
 
 With eyap, you can choose a backend to manage your comments. A key goal of
 the eyap package is that you can write your code in a generic way and easily
