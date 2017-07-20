@@ -12,13 +12,13 @@ def get_readme():
     'Get the long description from the README file'
 
     here = path.abspath(path.dirname(__file__))
-    with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+    with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
         result = f.read()
     return result
 
 setup(
     name='eyap',
-    version='0.4.2',
+    version='0.4.3',
     description='Tools for extending yapping and comment management',
     long_description=get_readme(),
     url='http://github.com/emin63/eyap',
