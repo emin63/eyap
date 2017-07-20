@@ -5,15 +5,16 @@ See LICENSE at the top-level of this distribution for more information
 or write to emin.martinian@gmail.com for more information.
 """
 
-from setuptools import setup, find_packages
 from os import path
+from setuptools import setup, find_packages
+
 
 def get_readme():
     'Get the long description from the README file'
 
     here = path.abspath(path.dirname(__file__))
-    with open(path.join(here, 'README.md'), encoding='utf-8') as f:
-        result = f.read()
+    with open(path.join(here, 'README.md'), encoding='utf-8') as my_fd:
+        result = my_fd.read()
     return result
 
 setup(
@@ -30,7 +31,7 @@ setup(
         'Intended Audience :: Developers',
         'Programming Language :: Python :: 3',
     ],
-    keywords='comment management', 
+    keywords='comment management',
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
