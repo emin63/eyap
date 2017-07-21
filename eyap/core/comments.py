@@ -5,6 +5,8 @@ import datetime
 import csv
 import os
 import doctest
+import re
+
 import dateutil
 
 
@@ -139,6 +141,8 @@ class CommentThread(object):
     database or whatever relatively painlessly.
     """
 
+    valid_attachment_loc_re = '^[-.a-zA-Z0-9_,/]+$'
+
     def __init__(self, owner, realm, topic,
                  user=None, token=None, thread_id=None):
         """Initializer.
@@ -262,21 +266,46 @@ class CommentThread(object):
 
         return self.content
 
+    def validate_attachment_location(self, location):
+        """Validate a proposed attachment location.
 
-class AttachmentHandler(object):
+        :arg location:     String representing location to put attachment.
 
-    def put_file(self, location, data):
-        FIXME
-        url = 'https://api.github.com/repos/aocks/%s/contents/files/%s/%s' % (
-            cap_settings.GITHUB_REPO, prefix, name)
-        auth = creds.get_github_credentials(current_user)
-        result = requests.put(url, auth=auth, data=json.dumps({
-            'message' : description, 'content' : content}))
-        if result.status_code != 201:
-            return render_template(
-                'generic_display.html', title='Unable to upload file',
-                commentary="Can't upload file with name %s due to error %s." % (
-                    name, result.reason))
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:   Raises an exception if attachment location is bad.
+                   By default, this just forces reasonable characters.
+                   Sub-classes can override as desired.
+
+        """
+        if not re.compile(self.valid_attachment_loc_re).match(location):
+            raise ValueError(
+                'Bad chars in attachment location. Must match %s' % (
+                    self.valid_attachment_loc_re))
+
+    def upload_attachment(self, location, data):
+        """Upload an attachment.
+
+        :arg location:    String identifying name or location to store
+                          the attachment. Usually just a file name is
+                          a good thing to use.
+
+        :arg data:        Either str or bytes or a file-like object with
+                          a read method represneting data for the attachment.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        :returns:    A string that can be added to a comment to reference
+                     the attachment.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:     Provide a way to upload a file attachment.  Ideally
+                     sub-classes should call validate_attachment_location
+                     to make sure the proposed location is valid.
+
+        """
+        raise NotImplementedError
 
 
 class FileCommentThread(CommentThread):
