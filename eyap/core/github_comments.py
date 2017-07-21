@@ -6,6 +6,7 @@ import re
 import json
 import logging
 import zipfile
+import base64
 
 import requests
 
@@ -145,7 +146,7 @@ class GitHubCommentThread(comments.CommentThread):
     search_url = 'https://api.github.com/search/issues'
     url_extras = ''  # useful in testing to add things to URL
 
-    def __init__(self, *args, **kw):
+    def __init__(self, *args, attachment_location='files', **kw):
         """Initializer.
 
         :arg *args, **kw:  As for CommentThread.__init__.
@@ -154,6 +155,7 @@ class GitHubCommentThread(comments.CommentThread):
         comments.CommentThread.__init__(self, *args, **kw)
         self.base_url = 'https://api.github.com/repos/%s/%s' % (
             self.owner, self.realm)
+        self.attachment_location = attachment_location
 
     def lookup_thread_id(self):
         """Lookup thread id as required by CommentThread.lookup_thread_id.
@@ -316,6 +318,30 @@ class GitHubCommentThread(comments.CommentThread):
                     result.status_code, self.topic, result.reason))
 
         return result
+
+    def upload_attachment(self, location, data):
+        """Upload attachment as required by CommentThread class.
+
+        See CommentThread.upload_attachment for details.
+        """
+        self.validate_attachment_location(location)
+        content = data.read() if hasattr(data, 'read') else data
+        orig_content = content
+        if isinstance(content, str):  # Need to base64 encode
+            content = base64.b64encode(
+                orig_content.encode('utf8')).decode('ascii')
+        apath = '%s/%s' % (self.attachment_location, location)
+        url = '%s/contents/%s' % (self.base_url, apath)
+        result = requests.put(
+            url, auth=(self.user, self.token), data=json.dumps({
+                'message': 'file attachment %s' % location,
+                'content': content}))
+        if result.status_code != 201:
+            raise ValueError(
+                "Can't upload attachment %s due to error %s." % (
+                    location, result.reason))
+        return '[%s](https://github.com/%s/%s/blob/master/%s)' % (
+            location, self.owner, self.realm, apath)
 
     @staticmethod
     def _regr_test_lookup():
