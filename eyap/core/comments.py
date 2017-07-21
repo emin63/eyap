@@ -7,6 +7,7 @@ import os
 import doctest
 import dateutil
 
+
 class SingleComment(object):
     """Class to hold information about a single comment.
 
@@ -51,15 +52,15 @@ class SingleComment(object):
 
     def to_dict(self):
         """Return description of self in dict format.
-        
+
         This is useful for serializing to something like json later.
         """
         jdict = {
-            'user' : self.user,
-            'body' : self.body,
-            'markup' : self.markup,
-            'url' : self.url,
-            'timestamp' : self.timestamp
+            'user': self.user,
+            'body': self.body,
+            'markup': self.markup,
+            'url': self.url,
+            'timestamp': self.timestamp
             }
         return jdict
 
@@ -83,6 +84,7 @@ class SingleComment(object):
     def __str__(self):
         return 'Subject: %s\nTimestamp: %s\n%s\n%s' % (
             self.summary, self.display_timestamp, '-'*10, self.body)
+
 
 class CommentSection(object):
     """Class to represent a section, thread or other collection of comments.
@@ -120,11 +122,13 @@ class CommentSection(object):
             item.set_display_mode(mytz, fmt)
 
     def show(self):
+        "Return string showing the comments."
         result = '\n'.join(['%s\n%s' % ('=' * 40, c) for c in self.comments])
         return result
 
     def __str__(self):
         return self.show()
+
 
 class CommentThread(object):
     """Abstract class used to interact with discussion threads.
@@ -176,7 +180,8 @@ class CommentThread(object):
         PURPOSE:        Basically this serves to lookup the thread id if/when
                         necessary so we can interact with the comments.
                         It is an abstract method so that we can write higher
-                        level methods in the CommentThread object which need it.
+                        level methods in the CommentThread object which need
+                        it.
 
         """
         raise NotImplementedError
@@ -233,7 +238,6 @@ class CommentThread(object):
         """
         raise NotImplementedError
 
-
     def get_comment_section(self, force_reload=False, reverse=False):
         """Get CommentSection instance representing all comments for thread.
 
@@ -274,7 +278,7 @@ class AttachmentHandler(object):
                 commentary="Can't upload file with name %s due to error %s." % (
                     name, result.reason))
 
-    
+
 class FileCommentThread(CommentThread):
     """Example file based comment thread for testing and showing example usage.
 
@@ -284,7 +288,7 @@ class FileCommentThread(CommentThread):
     of the file to store comments in.
     """
 
-    header = ['user', 'timestamp', 'body', 'url'] # header for csv file we store
+    header = ['user', 'timestamp', 'body', 'url']  # header for csv file
 
     def lookup_thread_id(self):
         "Lookup the thread id as path to comment file."
@@ -293,7 +297,7 @@ class FileCommentThread(CommentThread):
         return path
 
     def lookup_comments(self, reverse=False):
-        "Implement as required by parent to lookup comments in the file system."
+        "Implement as required by parent to lookup comments in file system."
 
         comments = []
         if self.thread_id is None:
