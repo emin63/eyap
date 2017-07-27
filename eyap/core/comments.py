@@ -81,7 +81,9 @@ class SingleComment(object):
 
         """
         my_stamp = dateutil.parser.parse(self.timestamp)
-        self.display_timestamp = my_stamp.astimezone(mytz).strftime(fmt)
+        tz_stamp = my_stamp.astimezone(
+            mytz) if my_stamp.tzinfo is not None else my_stamp
+        self.display_timestamp = my_stamp.strftime(fmt)
 
     def __str__(self):
         return 'Subject: %s\nTimestamp: %s\n%s\n%s' % (
@@ -304,6 +306,9 @@ class CommentThread(object):
 
         :arg data:        Either str or bytes or a file-like object with
                           a read method represneting data for the attachment.
+                          If a string, it must be a base 64 encoded
+                          representation of the bytes. If bytes, then we
+                          will base64.b64encode(data).decode('ascii').
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
