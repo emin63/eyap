@@ -311,7 +311,7 @@ class GitHubCommentThread(comments.CommentThread):
         if issue_json is None and comment_json is None:
             return comments.CommentSection([])
         cthread_list = [comments.SingleComment(
-            issue_json['user']['login'], issue_json['updated_at'],
+            issue_json['user']['login'], issue_json['created_at'],
             issue_json['body'], issue_json['html_url'],
             markup=markdown(issue_json['body'], extensions=[
                 'fenced_code', 'tables']))]
@@ -424,9 +424,10 @@ class GitHubCommentThread(comments.CommentThread):
         self.validate_attachment_location(location)
         content = data.read() if hasattr(data, 'read') else data
         orig_content = content
-        if isinstance(content, str):  # Need to base64 encode
-            content = base64.b64encode(
-                orig_content.encode('utf8')).decode('ascii')
+        if isinstance(content, bytes):
+            content = base64.b64encode(orig_content).decode('ascii')
+        else:
+            pass  # Should be base64 encoded already
         apath = '%s/%s' % (self.attachment_location, location)
         url = '%s/contents/%s' % (self.base_url, apath)
         result = requests.put(
