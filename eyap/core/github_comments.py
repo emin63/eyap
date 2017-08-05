@@ -2,6 +2,8 @@
 """
 
 import doctest
+import time
+import collections
 import re
 import json
 import logging
@@ -9,6 +11,14 @@ import zipfile
 import base64
 
 import requests
+
+from eyap.core import comments, yap_exceptions
+
+
+def fake_markdown(text, *args, **kw):
+    "Fake markdown"
+    _dummy_ignore = args, kw
+    return text
 
 
 try:
@@ -24,7 +34,9 @@ except ImportError as problem:
         dummy = args, kw
         return text
 
-from eyap.core import comments, yap_exceptions
+
+GitHubInfo = collections.namedtuple('GitHubInfo', [
+    'owner', 'realm', 'user', 'token'])
 
 
 class GitHubAngry(Exception):
@@ -39,30 +51,19 @@ class GitHubCommentGroup(object):
     """Class to represent a group of github comments.
     """
 
-    def __init__(self, owner, realm, topic_re,
-                 user=None, token=None, max_threads=None):
+    def __init__(self, topic_re, gh_info, max_threads=None, params=None):
         """Initializer.
 
-        :arg owner:    String owner (e.g., the repository owner if using
-                       GitHub as a backend).
-
-        :arg realm:    The realm (e.g., repository name on GitHub).
-
-        :arg topic_re: Regular expression for topics to include in group.
-
-        :arg user:     String user name.
-
-        :arg token:    Password or token to use to connect to backend.
+        :arg gh_info:    Instance of GitHubInfo describing how to access github
+        :arg param=None: Optional dict of params to pass to github request
 
         """
-        self.owner = owner
-        self.realm = realm
         self.topic_re = topic_re
-        self.user = user
-        self.token = token
+        self.gh_info = gh_info
         self.max_threads = max_threads
         self.base_url = 'https://api.github.com/repos/%s/%s' % (
-            self.owner, self.realm)
+            self.gh_info.owner, self.gh_info.realm)
+        self.params = dict(params) if params else {}
 
     def get_thread_info(self):
         """Return a json list with information about threads in the group.
@@ -71,9 +72,9 @@ class GitHubCommentGroup(object):
         my_re = re.compile(self.topic_re)
         url = '%s/issues' % (self.base_url)
         while url:
-            kwargs = {} if not self.user else {'auth': (
-                self.user, self.token)}
-            my_req = requests.get(url, **kwargs)
+            kwargs = {} if not self.gh_info.user else {'auth': (
+                self.gh_info.user, self.gh_info.token)}
+            my_req = requests.get(url, params=self.params, **kwargs)
             my_json = my_req.json()
             for item in my_json:
                 if my_re.search(item['title']):
@@ -101,8 +102,9 @@ class GitHubCommentGroup(object):
             for num, my_info in enumerate(id_list):
                 logging.info('Working on item %i : %s', num, my_info['number'])
                 my_thread = GitHubCommentThread(
-                    self.owner, self.realm, my_info['title'], self.user,
-                    self.token, thread_id=my_info['number'])
+                    self.gh_info.owner, self.gh_info.realm, my_info['title'],
+                    self.gh_info.user, self.gh_info.token,
+                    thread_id=my_info['number'])
                 csec = my_thread.get_comment_section()
                 cdict = [item.to_dict() for item in csec.comments]
                 my_json = json.dumps(cdict)
@@ -121,8 +123,8 @@ class GitHubCommentGroup(object):
 >>> user, token = None, None
 >>> import tempfile, shlex, os, zipfile
 >>> from eyap.core import github_comments
->>> group = github_comments.GitHubCommentGroup(
-...    'octocat', 'Hello-World', '.', user, token, max_threads=3)
+>>> info = github_comments.GitHubInfo('octocat', 'Hello-World', user, token)
+>>> group = github_comments.GitHubCommentGroup('.', info, max_threads=3)
 >>> fn = tempfile.mktemp(suffix='.zip')
 >>> group.export(fn)
 >>> zdata = zipfile.ZipFile(fn)
@@ -142,6 +144,8 @@ class GitHubCommentThread(comments.CommentThread):
     """Sub-class of CommentThread using GitHub as a back-end.
     """
 
+    __thread_id_cache = {}
+
     # Base url to use in searching for issues.
     search_url = 'https://api.github.com/search/issues'
     url_extras = ''  # useful in testing to add things to URL
@@ -157,6 +161,43 @@ class GitHubCommentThread(comments.CommentThread):
             self.owner, self.realm)
         self.attachment_location = attachment_location
 
+    @classmethod
+    def sleep_if_necessary(cls, user, token, endpoint='search'):
+        """Sleep a little if hit github recently to honor rate limit.
+        """
+        info = requests.get('https://api.github.com/rate_limit',
+                            auth=(user, token))
+        info_dict = info.json()
+        remaining = info_dict['resources'][endpoint]['remaining']
+        logging.debug('Search remaining on github is at %s', remaining)
+        if remaining <= 5:
+            sleep_time = 120
+        else:
+            sleep_time = 0
+        if sleep_time:
+            logging.warning('Sleep %i since github requests remaining  = %i',
+                            sleep_time, remaining)
+            time.sleep(sleep_time)
+            return True
+
+        return False
+
+    @classmethod
+    def update_cache_key(cls, cache_key, item=None):
+        """Get item in cache for cache_key and add item if item is not None.
+        """
+        contents = cls.__thread_id_cache.get(cache_key, None)
+        if item is not None:
+            cls.__thread_id_cache[cache_key] = item
+
+        return contents
+
+    @classmethod
+    def lookup_cache_key(cls, cache_key):
+        "Syntactic sugar for update_cache_key(cache_key)"
+
+        return cls.update_cache_key(cache_key)
+
     def lookup_thread_id(self):
         """Lookup thread id as required by CommentThread.lookup_thread_id.
 
@@ -167,6 +208,21 @@ class GitHubCommentThread(comments.CommentThread):
 
         query_string = '%s?q=in:title+%%3A%s%%3A+repo:%s/%s' % (
             self.search_url, self.topic, self.owner, self.realm)
+        cache_key = (self.owner, self.realm, self.topic)
+        result = self.lookup_cache_key(cache_key)
+        if result is not None:
+            my_req = self.raw_pull(result)
+            if my_req.status_code != 200:
+                result = None  # Cached item was no good
+            elif my_req.json()['title'] != self.topic:
+                logging.debug('Title must have changed; ignore cache')
+                result = None
+            else:
+                logging.debug('Using cached thread id %s for %s', str(result),
+                              str(cache_key))
+                return result
+        self.sleep_if_necessary(self.user, self.token)
+
         kwargs = {} if not self.user else {'auth': (
             self.user, self.token)}
         my_req = requests.get(query_string, **kwargs)
@@ -176,20 +232,28 @@ class GitHubCommentThread(comments.CommentThread):
                     my_req.status_code, self.topic, my_req.reason))
 
         data = my_req.json()
-        if data['total_count'] == 1:  # unique match
-            return data['items'][0]['number']
-        if data['total_count'] > 1:  # multiple matches since github doesn't
-            searched_data = [        # have unique search we must filter it
+        if data['total_count'] == 1:   # unique match
+            if data['items'][0]['title'] == self.topic:
+                result = data['items'][0]['number']
+            else:
+                result = None
+        elif data['total_count'] > 1:  # multiple matches since github doesn't
+            searched_data = [          # have unique search we must filter
                 item for item in data['items'] if item['title'] == self.topic]
-            if len(searched_data) > 1:
+            if len(searched_data) == 0:  # no matches
+                return None
+            elif len(searched_data) > 1:
                 raise yap_exceptions.UnableToFindUniqueTopic(
                     self.topic, data['total_count'], '')
             else:
                 assert len(searched_data) == 1, (
                     'Confused searching for topic "%s"' % str(self.topic))
-                return searched_data[0]['number']
+                result = searched_data[0]['number']
         else:
-            return None
+            result = None
+        self.update_cache_key(cache_key, result)
+
+        return result
 
     def raw_pull(self, topic):
         """Do a raw pull of data for given topic down from github.
@@ -205,6 +269,7 @@ class GitHubCommentThread(comments.CommentThread):
         PURPOSE:       Encapsulate call that gets raw data from github.
 
         """
+        assert topic is not None, 'A topic of None is not allowed'
         kwargs = {} if not self.user else {'auth': (self.user, self.token)}
         my_req = requests.get('%s/issues/%s' % (
             self.base_url, topic), **kwargs)
@@ -260,7 +325,7 @@ class GitHubCommentThread(comments.CommentThread):
         if issue_json is None and comment_json is None:
             return comments.CommentSection([])
         cthread_list = [comments.SingleComment(
-            issue_json['user']['login'], issue_json['updated_at'],
+            issue_json['user']['login'], issue_json['created_at'],
             issue_json['body'], issue_json['html_url'],
             markup=markdown(issue_json['body'], extensions=[
                 'fenced_code', 'tables']))]
@@ -278,10 +343,23 @@ class GitHubCommentThread(comments.CommentThread):
 
         return comments.CommentSection(cthread_list)
 
-    def add_comment(self, body, allow_create=False):
+    def add_comment(self, body, allow_create=False, allow_hashes=True):
         """Implement as required by CommentThread.add_comment.
 
         :arg body:    String/text of comment to add.
+
+        :arg allow_create=False: Whether to automatically create a new thread
+                                 if a thread does not exist (usually by calling
+                                 self.create_thread).
+
+        :arg allow_hashes=True:  Whether to support hashtag mentions of other
+                                 topics and automatically insert comment in
+                                 body into those topics as well.
+
+                                 *IMPORTANT*: if you recursively call
+                                 add_comment to insert the hashes, you should
+                                 make sure to set this to False to prevent
+                                 infinite hash processing loops.
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
@@ -296,6 +374,13 @@ class GitHubCommentThread(comments.CommentThread):
         if self.thread_id is None:
             self.thread_id = self.lookup_thread_id()
         data = json.dumps({'body': body})
+        if self.thread_id is None:
+            if allow_create:
+                return self.create_thread(body)
+            else:
+                raise ValueError(
+                    'Cannot find comment existing comment for %s' % self.topic)
+
         result = requests.post('%s/issues/%s/comments' % (
             self.base_url, self.thread_id), data, auth=(self.user, self.token))
         if result.status_code != 201:
@@ -306,7 +391,40 @@ class GitHubCommentThread(comments.CommentThread):
                     'Bad status %s add_comment on %s because %s' % (
                         result.status_code, self.topic, result.reason))
 
+        if allow_hashes:
+            self.process_hashes(body)
+
         return result
+
+    def process_hashes(self, body, allow_create=False):
+        """Process any hashes mentioned and push them to related topics.
+
+        :arg body:    Body of the comment to check for hashes and push out.
+
+        :arg allow_create=False:  Whether to allow creating new topics
+                                  from hash tag mentions.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:    Look for hashtags matching self.hashtag_re and when found,
+                    add comment from body to those topics.
+
+        """
+        hash_re = re.compile(self.hashtag_re)
+        hashes = hash_re.findall(body)
+        done = {self.topic.lower(): True}
+        for mention in hashes:
+            mention = mention.strip('#')
+            if mention.lower() in done:
+                continue  # Do not duplicate hash mentions
+            new_thread = self.__class__(
+                owner=self.owner, realm=self.realm, topic=mention,
+                user=self.user, token=self.token)
+            my_comment = '# Hashtag copy from %s:\n%s' % (self.topic, body)
+            new_thread.add_comment(
+                my_comment, allow_create=allow_create,
+                allow_hashes=False)  # allow_hashes=False to prevent inf loop
+            done[mention.lower()] = True
 
     def create_thread(self, body):
         data = json.dumps({'body': body, 'title': self.topic})
@@ -327,9 +445,10 @@ class GitHubCommentThread(comments.CommentThread):
         self.validate_attachment_location(location)
         content = data.read() if hasattr(data, 'read') else data
         orig_content = content
-        if isinstance(content, str):  # Need to base64 encode
-            content = base64.b64encode(
-                orig_content.encode('utf8')).decode('ascii')
+        if isinstance(content, bytes):
+            content = base64.b64encode(orig_content).decode('ascii')
+        else:
+            pass  # Should be base64 encoded already
         apath = '%s/%s' % (self.attachment_location, location)
         url = '%s/contents/%s' % (self.base_url, apath)
         result = requests.put(
@@ -355,7 +474,7 @@ class GitHubCommentThread(comments.CommentThread):
 >>> import tempfile, shlex, os, zipfile
 >>> from eyap.core import github_comments
 >>> t = github_comments.GitHubCommentThread(
-...     'emin63', 'eyap', '.', user, token, thread_id='1')
+...     'emin63', 'eyap', user, token, thread_id='1')
 >>> i, c = t.lookup_comment_list()
 >>> t.url_extras = '?per_page=1'
 >>> more_i, more_c = t.lookup_comment_list()

@@ -7,7 +7,7 @@ import os
 import doctest
 import re
 
-import dateutil
+import dateutil.parser
 
 
 class SingleComment(object):
@@ -81,12 +81,13 @@ class SingleComment(object):
 
         """
         my_stamp = dateutil.parser.parse(self.timestamp)
-        self.display_timestamp = my_stamp.astimezone(mytz).strftime(fmt)
+        tz_stamp = my_stamp.astimezone(
+            mytz) if my_stamp.tzinfo is not None else my_stamp
+        self.display_timestamp = my_stamp.strftime(fmt)
 
     def __str__(self):
         return 'Subject: %s\nTimestamp: %s\n%s\n%s' % (
             self.summary, self.display_timestamp, '-'*10, self.body)
-
 
 class CommentSection(object):
     """Class to represent a section, thread or other collection of comments.
@@ -141,6 +142,10 @@ class CommentThread(object):
     database or whatever relatively painlessly.
     """
 
+    # Regular expression for what consistutes a hashtag.
+    hashtag_re = '(#[-.a-zA-Z_/]+[a-zA-Z_])'
+
+    # Regular expression for valid attachment location
     valid_attachment_loc_re = '^[-.a-zA-Z0-9_,/]+$'
 
     def __init__(self, owner, realm, topic,
@@ -190,7 +195,7 @@ class CommentThread(object):
         """
         raise NotImplementedError
 
-    def add_comment(self, body, allow_create=False):
+    def add_comment(self, body, allow_create=False, allow_hashes=False):
         """Add the string comments to the thread.
 
         :arg body:        String/text of comment to add.
@@ -198,6 +203,15 @@ class CommentThread(object):
         :arg allow_create=False: Whether to automatically create a new thread
                                  if a thread does not exist (usually by calling
                                  self.create_thread).
+
+        :arg allow_hashes=False: Whether to support hashtag mentions of other
+                                 topics and automatically insert comment in
+                                 body into those topics as well.
+
+                                 *IMPORTANT*: if you recursively call
+                                 add_comment to insert the hashes, you should
+                                 make sure to set this to False to prevent
+                                 infinite hash processing loops.
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
@@ -292,6 +306,9 @@ class CommentThread(object):
 
         :arg data:        Either str or bytes or a file-like object with
                           a read method represneting data for the attachment.
+                          If a string, it must be a base 64 encoded
+                          representation of the bytes. If bytes, then we
+                          will base64.b64encode(data).decode('ascii').
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
