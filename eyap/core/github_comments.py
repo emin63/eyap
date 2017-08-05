@@ -189,6 +189,7 @@ class GitHubCommentThread(comments.CommentThread):
         contents = cls.__thread_id_cache.get(cache_key, None)
         if item is not None:
             cls.__thread_id_cache[cache_key] = item
+
         return contents
 
     @classmethod
@@ -210,9 +211,16 @@ class GitHubCommentThread(comments.CommentThread):
         cache_key = (self.owner, self.realm, self.topic)
         result = self.lookup_cache_key(cache_key)
         if result is not None:
-            logging.debug('Using cached thread id %s for %s', str(result),
-                          str(cache_key))
-            return result
+            my_req = self.raw_pull(result)
+            if my_req.status_code != 200:
+                result = None  # Cached item was no good
+            elif my_req.json()['title'] != self.topic:
+                logging.debug('Title must have changed; ignore cache')
+                result = None
+            else:
+                logging.debug('Using cached thread id %s for %s', str(result),
+                              str(cache_key))
+                return result
         self.sleep_if_necessary(self.user, self.token)
 
         kwargs = {} if not self.user else {'auth': (
@@ -225,11 +233,16 @@ class GitHubCommentThread(comments.CommentThread):
 
         data = my_req.json()
         if data['total_count'] == 1:   # unique match
-            result = data['items'][0]['number']
+            if data['items'][0]['title'] == self.topic:
+                result = data['items'][0]['number']
+            else:
+                result = None
         elif data['total_count'] > 1:  # multiple matches since github doesn't
             searched_data = [          # have unique search we must filter
                 item for item in data['items'] if item['title'] == self.topic]
-            if len(searched_data) > 1:
+            if len(searched_data) == 0:  # no matches
+                return None
+            elif len(searched_data) > 1:
                 raise yap_exceptions.UnableToFindUniqueTopic(
                     self.topic, data['total_count'], '')
             else:
@@ -256,6 +269,7 @@ class GitHubCommentThread(comments.CommentThread):
         PURPOSE:       Encapsulate call that gets raw data from github.
 
         """
+        assert topic is not None, 'A topic of None is not allowed'
         kwargs = {} if not self.user else {'auth': (self.user, self.token)}
         my_req = requests.get('%s/issues/%s' % (
             self.base_url, topic), **kwargs)
@@ -360,6 +374,13 @@ class GitHubCommentThread(comments.CommentThread):
         if self.thread_id is None:
             self.thread_id = self.lookup_thread_id()
         data = json.dumps({'body': body})
+        if self.thread_id is None:
+            if allow_create:
+                return self.create_thread(body)
+            else:
+                raise ValueError(
+                    'Cannot find comment existing comment for %s' % self.topic)
+
         result = requests.post('%s/issues/%s/comments' % (
             self.base_url, self.thread_id), data, auth=(self.user, self.token))
         if result.status_code != 201:
