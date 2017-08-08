@@ -65,7 +65,7 @@ class GitHubCommentGroup(object):
             self.gh_info.owner, self.gh_info.realm)
         self.params = dict(params) if params else {}
 
-    def get_thread_info(self):
+    def get_thread_info(self, enforce_re=True):
         """Return a json list with information about threads in the group.
         """
         result = []
@@ -77,7 +77,7 @@ class GitHubCommentGroup(object):
             my_req = requests.get(url, params=self.params, **kwargs)
             my_json = my_req.json()
             for item in my_json:
-                if my_re.search(item['title']):
+                if (not enforce_re) or my_re.search(item['title']):
                     result.append(item)
                     if self.max_threads is not None and len(
                             result) >= self.max_threads:
@@ -206,8 +206,8 @@ class GitHubCommentThread(comments.CommentThread):
         in init.
         """
 
-        query_string = '%s?q=in:title+%%3A%s%%3A+repo:%s/%s' % (
-            self.search_url, self.topic, self.owner, self.realm)
+        query_string = 'in:title "%s" repo:%s/%s' % (
+            self.topic, self.owner, self.realm)
         cache_key = (self.owner, self.realm, self.topic)
         result = self.lookup_cache_key(cache_key)
         if result is not None:
@@ -221,17 +221,8 @@ class GitHubCommentThread(comments.CommentThread):
                 logging.debug('Using cached thread id %s for %s', str(result),
                               str(cache_key))
                 return result
-        self.sleep_if_necessary(self.user, self.token)
+        data = self.raw_search(self.user, self.token, query_string)
 
-        kwargs = {} if not self.user else {'auth': (
-            self.user, self.token)}
-        my_req = requests.get(query_string, **kwargs)
-        if my_req.status_code != 200:
-            raise GitHubAngry(
-                'Bad status code %s finding topic %s because %s' % (
-                    my_req.status_code, self.topic, my_req.reason))
-
-        data = my_req.json()
         if data['total_count'] == 1:   # unique match
             if data['items'][0]['title'] == self.topic:
                 result = data['items'][0]['number']
@@ -240,7 +231,7 @@ class GitHubCommentThread(comments.CommentThread):
         elif data['total_count'] > 1:  # multiple matches since github doesn't
             searched_data = [          # have unique search we must filter
                 item for item in data['items'] if item['title'] == self.topic]
-            if len(searched_data) == 0:  # no matches
+            if searched_data:  # no matches
                 return None
             elif len(searched_data) > 1:
                 raise yap_exceptions.UnableToFindUniqueTopic(
@@ -254,6 +245,37 @@ class GitHubCommentThread(comments.CommentThread):
         self.update_cache_key(cache_key, result)
 
         return result
+
+    @classmethod
+    def raw_search(cls, user, token, query):
+        """Do a raw search for github issues.
+
+        :arg user:        Username to use in accessing github.
+
+        :arg token:       Token to use in accessing github.
+
+        :arg query:       String query to use in searching github.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        :returns:       JSON result returned from github.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:        Search for issues on github.
+
+        """
+        cls.sleep_if_necessary(user, token)
+
+        kwargs = {} if not user else {'auth': (user, token)}
+        my_req = requests.get(cls.search_url, params={'q': query}, **kwargs)
+        if my_req.status_code != 200:
+            raise GitHubAngry(
+                'Bad status code %s finding query %s because %s' % (
+                    my_req.status_code, query, my_req.reason))
+
+        data = my_req.json()
+        return data
 
     def raw_pull(self, topic):
         """Do a raw pull of data for given topic down from github.
