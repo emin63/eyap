@@ -221,7 +221,7 @@ class GitHubCommentThread(comments.CommentThread):
                 logging.debug('Using cached thread id %s for %s', str(result),
                               str(cache_key))
                 return result
-        data = self.raw_search(self.user, self.token, query_string)
+        data, dummy_hdr = self.raw_search(self.user, self.token, query_string)
 
         if data['total_count'] == 1:   # unique match
             if data['items'][0]['title'] == self.topic:
@@ -231,7 +231,7 @@ class GitHubCommentThread(comments.CommentThread):
         elif data['total_count'] > 1:  # multiple matches since github doesn't
             searched_data = [          # have unique search we must filter
                 item for item in data['items'] if item['title'] == self.topic]
-            if searched_data:  # no matches
+            if not searched_data:  # no matches
                 return None
             elif len(searched_data) > 1:
                 raise yap_exceptions.UnableToFindUniqueTopic(
@@ -275,7 +275,7 @@ class GitHubCommentThread(comments.CommentThread):
                     my_req.status_code, query, my_req.reason))
 
         data = my_req.json()
-        return data
+        return data, my_req.headers
 
     def raw_pull(self, topic):
         """Do a raw pull of data for given topic down from github.
