@@ -350,13 +350,14 @@ class GitHubCommentThread(comments.CommentThread):
             issue_json['user']['login'], issue_json['created_at'],
             issue_json['body'], issue_json['html_url'],
             markup=markdown(issue_json['body'], extensions=[
-                'fenced_code', 'tables']))]
+                'fenced_code', 'tables', 'markdown.extensions.nl2br']))]
 
         for item in comment_json:
             comment = comments.SingleComment(
                 item['user']['login'], item['updated_at'], item['body'],
                 item['html_url'], markup=markdown(
-                    item['body'], extensions=['fenced_code', 'tables']))
+                    item['body'], extensions=[
+                        'fenced_code', 'tables', 'markdown.extensions.nl2br']))
 
             cthread_list.append(comment)
 
