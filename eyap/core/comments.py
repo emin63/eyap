@@ -10,8 +10,10 @@ import urllib.parse
 
 import dateutil.parser
 
+from requests.models import Response
 
-class SingleComment(object):
+
+class SingleComment(object):  # pylint: disable=too-many-instance-attributes
     """Class to hold information about a single comment.
 
     SingleComment instances will usually be collected into a list of
@@ -116,11 +118,12 @@ class SingleComment(object):
         my_stamp = dateutil.parser.parse(self.timestamp)
         tz_stamp = my_stamp.astimezone(
             mytz) if my_stamp.tzinfo is not None else my_stamp
-        self.display_timestamp = my_stamp.strftime(fmt)
+        self.display_timestamp = tz_stamp.strftime(fmt)
 
     def __str__(self):
         return 'Subject: %s\nTimestamp: %s\n%s\n%s' % (
             self.summary, self.display_timestamp, '-'*10, self.body)
+
 
 class CommentSection(object):
     """Class to represent a section, thread or other collection of comments.
@@ -397,9 +400,23 @@ class FileCommentThread(CommentThread):
 
         return CommentSection(comments)
 
-    def add_comment(self, body, allow_create=False):
+    def create_thread(self, body):
+        """Implement create_thread as required by parent.
+
+        This basically just calls add_comment with allow_create=True
+        and then builds a response object to indicate everything is fine.
+        """
+        self.add_comment(body, allow_create=True)
+        the_response = Response()
+        the_response.code = "OK"
+        the_response.status_code = 200
+
+    def add_comment(self, body, allow_create=False, allow_hashes=False):
         "Implement as required by parent to store comment in CSV file."
 
+        if allow_hashes:
+            raise ValueError('allow_hashes not implemented for %s yet' % (
+                self.__class__.__name__))
         if self.thread_id is None:
             self.thread_id = self.lookup_thread_id()
         if not os.path.exists(self.thread_id):
