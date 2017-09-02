@@ -6,6 +6,7 @@ import csv
 import os
 import doctest
 import re
+import urllib.parse
 
 import dateutil.parser
 
@@ -51,6 +52,38 @@ class SingleComment(object):
             body.split('\n')[0][0:40] + ' ...')
         self.summary_cls = None
         self.display_timestamp = timestamp
+
+    def make_anchor_id(self):
+        """Return string to use as URL anchor for this comment.
+        """
+        result = re.sub(
+            '[^a-zA-Z0-9_]', '_', self.user + '_' + self.timestamp)
+        return result
+
+    def make_url(self, my_request, anchor_id=None):
+        """Make URL to this comment.
+
+        :arg my_request:  The request object where this comment is seen from.
+
+        :arg anchor_id=None:    Optional anchor id. If None, we use
+                                self.make_anchor_id()
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        :returns:       String URL to this comment.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:        Be able to create links to this comment.
+
+        """
+        if anchor_id is None:
+            anchor_id = self.make_anchor_id()
+        result = '{}?{}#{}'.format(
+            my_request.path, urllib.parse.urlencode(my_request.args),
+            anchor_id)
+
+        return result
 
     def to_dict(self):
         """Return description of self in dict format.
