@@ -179,7 +179,7 @@ class CommentThread(object):
     """
 
     # Regular expression for what consistutes a hashtag.
-    hashtag_re = '(#[-.a-zA-Z_/]+[a-zA-Z_])'
+    hashtag_re = r'\s+(#[-.a-zA-Z_/]+[a-zA-Z_])'
 
     # Regular expression for valid attachment location
     valid_attachment_loc_re = '^[-.a-zA-Z0-9_,/]+$'
