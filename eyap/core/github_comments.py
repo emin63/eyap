@@ -70,7 +70,7 @@ class GitHubCommentGroup(object):
         """
         result = []
         my_re = re.compile(self.topic_re)
-        url = '%s/issues' % (self.base_url)
+        url = '%s/issues?sort=updated' % (self.base_url)
         while url:
             kwargs = {} if not self.gh_info.user else {'auth': (
                 self.gh_info.user, self.gh_info.token)}
@@ -162,7 +162,7 @@ class GitHubCommentThread(comments.CommentThread):
         self.attachment_location = attachment_location
 
     @classmethod
-    def sleep_if_necessary(cls, user, token, endpoint='search'):
+    def sleep_if_necessary(cls, user, token, endpoint='search', msg=''):
         """Sleep a little if hit github recently to honor rate limit.
         """
         info = requests.get('https://api.github.com/rate_limit',
@@ -175,8 +175,8 @@ class GitHubCommentThread(comments.CommentThread):
         else:
             sleep_time = 0
         if sleep_time:
-            logging.warning('Sleep %i since github requests remaining  = %i',
-                            sleep_time, remaining)
+            logging.warning('Sleep %i since github requests remaining  = %i%s',
+                            sleep_time, remaining, msg)
             time.sleep(sleep_time)
             return True
 
@@ -265,7 +265,7 @@ class GitHubCommentThread(comments.CommentThread):
         PURPOSE:        Search for issues on github.
 
         """
-        cls.sleep_if_necessary(user, token)
+        cls.sleep_if_necessary(user, token, msg='\nquery="%s"' % str(query))
 
         kwargs = {} if not user else {'auth': (user, token)}
         my_req = requests.get(cls.search_url, params={'q': query}, **kwargs)
