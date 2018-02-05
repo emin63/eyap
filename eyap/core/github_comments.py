@@ -336,7 +336,7 @@ class GitHubCommentThread(comments.CommentThread):
                 for thing in link:
                     potential_url, part = thing.split('; ')
                     if part == 'rel="next"':
-                        comments_url = potential_url.lstrip('<').rstrip('>')
+                        comments_url = potential_url.lstrip(' <').rstrip('> ')
 
         return issue_json, comments_json
 
