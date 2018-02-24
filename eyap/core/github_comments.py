@@ -90,7 +90,7 @@ class GitHubCommentGroup(object):
                 for thing in link:
                     potential_url, part = thing.split('; ')
                     if part == 'rel="next"':
-                        url = potential_url.lstrip('<').rstrip('>')
+                        url = potential_url.lstrip(' <').rstrip('> ')
 
         return result
 
