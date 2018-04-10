@@ -50,7 +50,15 @@ class RedisCommentThread(comments.CommentThread):
 
     def create_thread(self, body):
         return self.add_comment(body, allow_create=True)
-        
+
+    def delete_thread(self, really=False):
+        thread_id = self.lookup_thread_id()        
+        if not really:
+            raise ValueError(
+                'Cowardly refusing to delete thread %s since really=%s' % (
+                    thread_id, really))
+        self.redis.delete(thread_id)
+
     def lookup_comments(self, reverse=False):
         thread_id = self.lookup_thread_id()
         data = self.redis.lrange(thread_id, 0, -1)
