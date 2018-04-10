@@ -7,6 +7,7 @@ import os
 import doctest
 import re
 import urllib.parse
+import json
 
 import dateutil.parser
 
@@ -20,8 +21,8 @@ class SingleComment(object):  # pylint: disable=too-many-instance-attributes
     instances in a CommentSection representing a thread of discussion.
     """
 
-    def __init__(self, user, timestamp, body, url, summary=None, markup=None,
-                 summary_cls=None):
+    def __init__(self, user, timestamp, body, url=None, summary=None,
+                 markup=None, summary_cls=None):
         """Initializer.
 
         :arg user:        String name for user creating/owning comment.
@@ -30,9 +31,10 @@ class SingleComment(object):  # pylint: disable=too-many-instance-attributes
 
         :arg body:        String body of comment.
 
-        :arg url:         String url where comment lives.
+        :arg url=None:    String url where comment lives.
 
-        :arg summary=None:    One line text summar of comment.
+        :arg summary=None:    One line text summary of comment. If not given,
+                              we take first 40 characters of 1st line of body.
 
         :arg markup=None:     Text of comment marked up with HTML or
                               other way of display. If not provided, we just
@@ -94,6 +96,7 @@ class SingleComment(object):  # pylint: disable=too-many-instance-attributes
         """
         jdict = {
             'user': self.user,
+            'summary': self.summary,
             'body': self.body,
             'markup': self.markup,
             'url': self.url,
@@ -119,6 +122,12 @@ class SingleComment(object):  # pylint: disable=too-many-instance-attributes
         tz_stamp = my_stamp.astimezone(
             mytz) if my_stamp.tzinfo is not None else my_stamp
         self.display_timestamp = tz_stamp.strftime(fmt)
+
+    def to_json(self):
+        my_dict = self.to_dict()
+        my_ts = my_dict['timestamp']
+        my_dict['timestamp'] = getattr(my_ts, 'isoformat', lambda: my_ts)()
+        return json.dumps(my_dict)
 
     def __str__(self):
         return 'Subject: %s\nTimestamp: %s\n%s\n%s' % (
