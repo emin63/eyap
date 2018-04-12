@@ -80,8 +80,12 @@ class RedisCommentThread(comments.CommentThread):
 >>> rc.delete_thread(really=True)
 >>> rc.add_comment('test_comment', allow_create=True)
 >>> sec = rc.lookup_comments('test-topic')
->>> print(sec.show())
-FIXME
+>>> print(sec.show())  # doctest: +ELLIPSIS
+========================================
+Subject: test_comment ...
+Timestamp: ...
+----------
+test_comment
         """
     
 
