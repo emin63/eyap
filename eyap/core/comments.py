@@ -197,6 +197,12 @@ class CommentThread(object):
                  user=None, token=None, thread_id=None):
         """Initializer.
 
+        Since this is an abstract class which each backend implements,
+        it is not quite possible to know all the different arguments which
+        may be necessary. We use the following generic arguments that all
+        sub-class of CommentThread are expected to implement. Your particular
+        sub-class may also add additional arguments if necessary.
+
         :arg owner:    String owner (e.g., the repository owner if using
                        GitHub as a backend).
 
