@@ -3,18 +3,12 @@
 
 import datetime
 import doctest
-import time
-import re
 import json
 import logging
-import zipfile
-import base64
-
-import requests
-
 import redis
 
-from eyap.core import comments, yap_exceptions
+from eyap.core import comments
+
 
 class RedisCommentThread(comments.CommentThread):
     """Class to represent a thread of redis comments.
@@ -30,6 +24,8 @@ class RedisCommentThread(comments.CommentThread):
 
     def add_comment(self, body, allow_create=False, allow_hashes=False,
                     summary=None):
+        """Add comment as required by comments.CommentThread parent class.
+        """
         thread_id = self.lookup_thread_id()
         if not allow_create and not self.redis.exists(thread_id):
             raise ValueError('Tried to add comment to non-exist thread %s' % (
@@ -80,8 +76,13 @@ class RedisCommentThread(comments.CommentThread):
 >>> rc.delete_thread(really=True)
 >>> rc.add_comment('test_comment', allow_create=True)
 >>> sec = rc.lookup_comments('test-topic')
->>> print(sec.show())
-FIXME
+>>> print(sec.show())  # doctest: +ELLIPSIS
+========================================
+Subject: test_comment ...
+Timestamp: ...
+----------
+test_comment
+
         """
     
 
