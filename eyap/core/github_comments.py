@@ -165,8 +165,8 @@ class GitHubCommentThread(comments.CommentThread):
     def sleep_if_necessary(cls, user, token, endpoint='search', msg=''):
         """Sleep a little if hit github recently to honor rate limit.
         """
-        info = requests.get('https://api.github.com/rate_limit',
-                            auth=(user, token))
+        my_kw = {'auth': (user, token)} if user else {}
+        info = requests.get('https://api.github.com/rate_limit', **my_kw)
         info_dict = info.json()
         remaining = info_dict['resources'][endpoint]['remaining']
         logging.debug('Search remaining on github is at %s', remaining)
