@@ -48,17 +48,17 @@ access will post or read an issue from github.
 >>> print(str(g_thread.lookup_comments())) # doctest: +ELLIPSIS
 ========================================
 Subject: We need a simple description of how to u ...
-Timestamp: 2017-07-19T22:26:51Z
+Timestamp: ...
 ----------
 We need a simple description of how to use eyap.
 ========================================
 Subject: Start with top-level README.md ...
-Timestamp: 2017-07-19T22:22:56Z
+Timestamp: ...
 ----------
 Start with top-level README.md
 ========================================
 Subject: All done! ...
-Timestamp: 2017-07-19T22:26:51Z
+Timestamp: ...
 ----------
 All done!
 
