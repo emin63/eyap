@@ -246,7 +246,8 @@ class CommentThread(object):
         """
         raise NotImplementedError
 
-    def add_comment(self, body, allow_create=False, allow_hashes=False):
+    def add_comment(self, body, allow_create=False, allow_hashes=False,
+                    summary=None):
         """Add the string comments to the thread.
 
         :arg body:        String/text of comment to add.
@@ -263,6 +264,10 @@ class CommentThread(object):
                                  add_comment to insert the hashes, you should
                                  make sure to set this to False to prevent
                                  infinite hash processing loops.
+
+        :arg summary=None:       Optional summary to use for the comment. The
+                                 backend should pass this to SingleComment if
+                                 given.
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
@@ -385,7 +390,7 @@ class FileCommentThread(CommentThread):
     of the file to store comments in.
     """
 
-    header = ['user', 'timestamp', 'body', 'url']  # header for csv file
+    header = ['user', 'timestamp', 'summary', 'body', 'url']  # header for csv
 
     def lookup_thread_id(self):
         "Lookup the thread id as path to comment file."
@@ -407,9 +412,10 @@ class FileCommentThread(CommentThread):
             for num, line in enumerate(reader):
                 if not line:
                     continue
-                assert len(line) == 4, 'Line %i in path %s misformatted' % (
-                    num+1, path)
-                comments.append(SingleComment(*line))
+                assert len(line) == len(header), (
+                    'Line %i in path %s misformatted' % (num+1, path))
+                line_kw = dict(zip(header, line))
+                comments.append(SingleComment(**line_kw))
         if reverse:
             comments = list(reversed(comments))
 
@@ -426,7 +432,8 @@ class FileCommentThread(CommentThread):
         the_response.code = "OK"
         the_response.status_code = 200
 
-    def add_comment(self, body, allow_create=False, allow_hashes=False):
+    def add_comment(self, body, allow_create=False, allow_hashes=False,
+                    summary=None):
         "Implement as required by parent to store comment in CSV file."
 
         if allow_hashes:
@@ -442,7 +449,8 @@ class FileCommentThread(CommentThread):
 
         with open(self.thread_id, 'a', newline='') as fdesc:
             writer = csv.writer(fdesc)
-            writer.writerow([self.user, datetime.datetime.utcnow(), body, ''])
+            writer.writerow([self.user, datetime.datetime.utcnow(), summary,
+                             body, ''])
 
     @staticmethod
     def _regr_tests():
