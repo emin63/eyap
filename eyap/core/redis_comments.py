@@ -74,7 +74,9 @@ class RedisCommentThread(comments.CommentThread):
 >>> rc = redis_comments.RedisCommentThread(
 ...     'test-owner', 'test-realm', 'test-topic', 'test-owner')
 >>> rc.delete_thread(really=True)
->>> rc.add_comment('test_comment', allow_create=True)
+>>> status = rc.add_comment('test_comment', allow_create=True)
+>>> print(', '.join(['%s: %s' % (k, status[k]) for k in sorted(status)]))
+lpush: 1, ltrim: None, status: OK
 >>> sec = rc.lookup_comments('test-topic')
 >>> print(sec.show())  # doctest: +ELLIPSIS
 ========================================
