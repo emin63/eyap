@@ -165,8 +165,8 @@ class GitHubCommentThread(comments.CommentThread):
     def sleep_if_necessary(cls, user, token, endpoint='search', msg=''):
         """Sleep a little if hit github recently to honor rate limit.
         """
-        info = requests.get('https://api.github.com/rate_limit',
-                            auth=(user, token))
+        my_kw = {'auth': (user, token)} if user else {}
+        info = requests.get('https://api.github.com/rate_limit', **my_kw)
         info_dict = info.json()
         remaining = info_dict['resources'][endpoint]['remaining']
         logging.debug('Search remaining on github is at %s', remaining)
@@ -366,7 +366,8 @@ class GitHubCommentThread(comments.CommentThread):
 
         return comments.CommentSection(cthread_list)
 
-    def add_comment(self, body, allow_create=False, allow_hashes=True):
+    def add_comment(self, body, allow_create=False, allow_hashes=True,
+                    summary=None):
         """Implement as required by CommentThread.add_comment.
 
         :arg body:    String/text of comment to add.
@@ -383,6 +384,10 @@ class GitHubCommentThread(comments.CommentThread):
                                  add_comment to insert the hashes, you should
                                  make sure to set this to False to prevent
                                  infinite hash processing loops.
+
+        arg summary=None:        Optional summary. If not given, we will
+                                 extract one from body automatically if
+                                 necessary.
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 

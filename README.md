@@ -94,5 +94,7 @@ We currently have the following back-ends available:
 
   `file`:    A simple file-based back-end.
   `github`:  Reading/writing comments to github issues.
+  `redis`:   Use redis to store comments. You will have to install redis
+             and redis-py (e.g., with `pip install redis`) for this to work.
 
 Pull requests are welcome to add more back-ends.

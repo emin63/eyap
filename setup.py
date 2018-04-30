@@ -8,6 +8,8 @@ or write to emin.martinian@gmail.com for more information.
 from os import path
 from setuptools import setup, find_packages
 
+import eyap
+
 
 def get_readme():
     'Get the long description from the README file'
@@ -20,7 +22,7 @@ def get_readme():
 
 setup(
     name='eyap',
-    version='0.7.5',
+    version=eyap.VERSION,
     description='Tools for extending yapping and comment management',
     long_description=get_readme(),
     url='http://github.com/emin63/eyap',

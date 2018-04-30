@@ -7,6 +7,7 @@ import os
 import doctest
 import re
 import urllib.parse
+import json
 
 import dateutil.parser
 
@@ -20,8 +21,8 @@ class SingleComment(object):  # pylint: disable=too-many-instance-attributes
     instances in a CommentSection representing a thread of discussion.
     """
 
-    def __init__(self, user, timestamp, body, url, summary=None, markup=None,
-                 summary_cls=None):
+    def __init__(self, user, timestamp, body, url=None, summary=None,
+                 markup=None, summary_cls=None):
         """Initializer.
 
         :arg user:        String name for user creating/owning comment.
@@ -30,9 +31,10 @@ class SingleComment(object):  # pylint: disable=too-many-instance-attributes
 
         :arg body:        String body of comment.
 
-        :arg url:         String url where comment lives.
+        :arg url=None:    String url where comment lives.
 
-        :arg summary=None:    One line text summar of comment.
+        :arg summary=None:    One line text summary of comment. If not given,
+                              we take first 40 characters of 1st line of body.
 
         :arg markup=None:     Text of comment marked up with HTML or
                               other way of display. If not provided, we just
@@ -94,6 +96,7 @@ class SingleComment(object):  # pylint: disable=too-many-instance-attributes
         """
         jdict = {
             'user': self.user,
+            'summary': self.summary,
             'body': self.body,
             'markup': self.markup,
             'url': self.url,
@@ -119,6 +122,12 @@ class SingleComment(object):  # pylint: disable=too-many-instance-attributes
         tz_stamp = my_stamp.astimezone(
             mytz) if my_stamp.tzinfo is not None else my_stamp
         self.display_timestamp = tz_stamp.strftime(fmt)
+
+    def to_json(self):
+        my_dict = self.to_dict()
+        my_ts = my_dict['timestamp']
+        my_dict['timestamp'] = getattr(my_ts, 'isoformat', lambda: my_ts)()
+        return json.dumps(my_dict)
 
     def __str__(self):
         return 'Subject: %s\nTimestamp: %s\n%s\n%s' % (
@@ -188,6 +197,12 @@ class CommentThread(object):
                  user=None, token=None, thread_id=None):
         """Initializer.
 
+        Since this is an abstract class which each backend implements,
+        it is not quite possible to know all the different arguments which
+        may be necessary. We use the following generic arguments that all
+        sub-class of CommentThread are expected to implement. Your particular
+        sub-class may also add additional arguments if necessary.
+
         :arg owner:    String owner (e.g., the repository owner if using
                        GitHub as a backend).
 
@@ -231,7 +246,8 @@ class CommentThread(object):
         """
         raise NotImplementedError
 
-    def add_comment(self, body, allow_create=False, allow_hashes=False):
+    def add_comment(self, body, allow_create=False, allow_hashes=False,
+                    summary=None):
         """Add the string comments to the thread.
 
         :arg body:        String/text of comment to add.
@@ -248,6 +264,10 @@ class CommentThread(object):
                                  add_comment to insert the hashes, you should
                                  make sure to set this to False to prevent
                                  infinite hash processing loops.
+
+        :arg summary=None:       Optional summary to use for the comment. The
+                                 backend should pass this to SingleComment if
+                                 given.
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
@@ -370,7 +390,7 @@ class FileCommentThread(CommentThread):
     of the file to store comments in.
     """
 
-    header = ['user', 'timestamp', 'body', 'url']  # header for csv file
+    header = ['user', 'timestamp', 'summary', 'body', 'url']  # header for csv
 
     def lookup_thread_id(self):
         "Lookup the thread id as path to comment file."
@@ -392,9 +412,10 @@ class FileCommentThread(CommentThread):
             for num, line in enumerate(reader):
                 if not line:
                     continue
-                assert len(line) == 4, 'Line %i in path %s misformatted' % (
-                    num+1, path)
-                comments.append(SingleComment(*line))
+                assert len(line) == len(header), (
+                    'Line %i in path %s misformatted' % (num+1, path))
+                line_kw = dict(zip(header, line))
+                comments.append(SingleComment(**line_kw))
         if reverse:
             comments = list(reversed(comments))
 
@@ -411,7 +432,8 @@ class FileCommentThread(CommentThread):
         the_response.code = "OK"
         the_response.status_code = 200
 
-    def add_comment(self, body, allow_create=False, allow_hashes=False):
+    def add_comment(self, body, allow_create=False, allow_hashes=False,
+                    summary=None):
         "Implement as required by parent to store comment in CSV file."
 
         if allow_hashes:
@@ -427,7 +449,8 @@ class FileCommentThread(CommentThread):
 
         with open(self.thread_id, 'a', newline='') as fdesc:
             writer = csv.writer(fdesc)
-            writer.writerow([self.user, datetime.datetime.utcnow(), body, ''])
+            writer.writerow([self.user, datetime.datetime.utcnow(), summary,
+                             body, ''])
 
     @staticmethod
     def _regr_tests():
