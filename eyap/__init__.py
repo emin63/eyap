@@ -79,22 +79,65 @@ Finally, we cleanup the file based backend since we don't need it anymore.
 False
 
 ```
+
+See the [README.md on
+github](https://github.com/emin63/eyap/blob/master/README.md) for
+further details on usage, how to create new backends, etc.
+
 """
 
+import logging
 import doctest
 
 from eyap.core import comments, github_comments
 
+try:  # Try to import redis if possible
+    from eyap.core import redis_comments
+except ImportError as prob:  # Create mock class to complain about install.
+    msg = '\n'.join(['Could not import redis_comments because of error:',
+                     str(prob), 'If the problem is that redis is missing,'
+                     'Consider installing via `pip install redis`.'])
+    logging.debug(msg)
+    class ComplainOnRedis:
+        "Mock module to complain if we try to use redis backend."
+        class RedisCommentThread:
+            "Mock class to complain if we try to use redis backend."
+            def __init__(self, *args, **kwargs):
+                dummy = args, kwargs
+                raise Exception(msg)
+
+    redis_comments = ComplainOnRedis
+
+
 class Make(object):
 
-    known_backends = {
+    _known_backends = {
         'file': comments.FileCommentThread,
         'github': github_comments.GitHubCommentThread,
+        'redis': redis_comments.RedisCommentThread
         }
 
     @classmethod
     def comment_thread(cls, backend, *args, **kwargs):
-        ct_cls = cls.known_backends.get(backend)
+        """Create a comment thread for the desired backend.
+
+        :arg backend:        String name of backend (e.g., 'file',
+                             'github', 'redis', etc.).
+
+        :arg *args, **kwargs:   Arguments to be passed to contructor
+                                for that backend.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        :returns:  A CommentThread sub-class for the given backend.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:  Some simple syntatic sugar for creating the desired
+                  backend.
+
+        """
+        ct_cls = cls._known_backends.get(backend)
         if not ct_cls:
             return None
         return ct_cls(*args, **kwargs)
