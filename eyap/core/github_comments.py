@@ -247,7 +247,7 @@ class GitHubCommentThread(comments.CommentThread):
         return result
 
     @classmethod
-    def raw_search(cls, user, token, query):
+    def raw_search(cls, user, token, query, page=0):
         """Do a raw search for github issues.
 
         :arg user:        Username to use in accessing github.
@@ -256,25 +256,48 @@ class GitHubCommentThread(comments.CommentThread):
 
         :arg query:       String query to use in searching github.
 
-        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
-
-        :returns:       JSON result returned from github.
+        :arg page=0:      Number of pages to automatically paginate.
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-        PURPOSE:        Search for issues on github.
+        :returns:       The pair (result, header) representing the result
+                        from github along with the header.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:        Search for issues on github. If page > 0 then we
+                        will pull out up to page more pages via automatic
+                        pagination. The best way to check if you got the
+                        full results is to check if results['total_count']
+                        matches len(results['items']).
 
         """
-        cls.sleep_if_necessary(user, token, msg='\nquery="%s"' % str(query))
-
+        page = int(page)
         kwargs = {} if not user else {'auth': (user, token)}
-        my_req = requests.get(cls.search_url, params={'q': query}, **kwargs)
-        if my_req.status_code != 200:
-            raise GitHubAngry(
-                'Bad status code %s finding query %s because %s' % (
-                    my_req.status_code, query, my_req.reason))
+        my_url = cls.search_url
+        data = {'items': []}
+        while my_url:
+            cls.sleep_if_necessary(
+                user, token, msg='\nquery="%s"' % str(query))
+            my_req = requests.get(my_url, params={'q': query}, **kwargs)
+            if my_req.status_code != 200:
+                raise GitHubAngry(
+                    'Bad status code %s finding query %s because %s' % (
+                        my_req.status_code, query, my_req.reason))
+            my_json = my_req.json()
+            assert isinstance(my_json['items'], list)
+            data['items'].extend(my_json.pop('items'))
+            data.update(my_json)
+            my_url = None
 
-        data = my_req.json()
+            if page and my_req.links.get('next', False):
+                my_url = my_req.links['next']['url']
+            if my_url:
+                page = page - 1
+                logging.debug(
+                    'Paginating %s in raw_search (%i more pages allowed)',
+                    my_req.links, page)
+
         return data, my_req.headers
 
     def raw_pull(self, topic):
