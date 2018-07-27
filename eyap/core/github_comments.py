@@ -1,6 +1,7 @@
 """Module for working comments from GitHub backend.
 """
 
+import datetime
 import doctest
 import time
 import collections
@@ -65,12 +66,58 @@ class GitHubCommentGroup(object):
             self.gh_info.owner, self.gh_info.realm)
         self.params = dict(params) if params else {}
 
-    def get_thread_info(self, enforce_re=True):
+    @staticmethod
+    def parse_date(my_date):
+        """Parse a date into canonical format of datetime.dateime.
+
+        :param my_date:    Either datetime.datetime or string in 
+                           '%Y-%m-%dT%H:%M:%SZ' format.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        :return:  A datetime.datetime.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:  Parse a date and make sure it has no time zone.
+
+        """
+        if isinstance(my_date, datetime.datetime):
+            result = my_date
+        elif isinstance(my_date, str):
+            result = datetime.datetime.strptime(my_date, '%Y-%m-%dT%H:%M:%SZ')
+        else:
+            raise ValueError('Unexpected date format for "%s" of type "%s"' % (
+                str(my_date), type(my_date)))
+        assert result.tzinfo is None, 'Unexpected tzinfo for date %s' % (
+            result)
+        return result
+
+    def get_thread_info(self, enforce_re=True, latest_date=None):
         """Return a json list with information about threads in the group.
+
+        :param enforce_re=True:        Whether to require titles to match
+                                       regexp in self.topic_re.
+
+        :param latest_date=None:       Optional datetime.datetime for latest
+                                       date to consider. Things past this
+                                       are ignored.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        :return:  List of github items found.
+
+        ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+        PURPOSE:   Return a json list with information about threads
+                   in the group. Along with latest_date, this can be used
+                   to show issues.
+
         """
         result = []
         my_re = re.compile(self.topic_re)
         url = '%s/issues?sort=updated' % (self.base_url)
+        latest_date = self.parse_date(latest_date) if latest_date else None
         while url:
             kwargs = {} if not self.gh_info.user else {'auth': (
                 self.gh_info.user, self.gh_info.token)}
@@ -78,6 +125,11 @@ class GitHubCommentGroup(object):
             my_json = my_req.json()
             for item in my_json:
                 if (not enforce_re) or my_re.search(item['title']):
+                    idate = self.parse_date(item['updated_at'])
+                    if (latest_date is not None and idate > latest_date):
+                        logging.debug('Skip %s since updated at %s > %s',
+                                      item['title'], idate, latest_date)
+                        continue
                     result.append(item)
                     if self.max_threads is not None and len(
                             result) >= self.max_threads:
@@ -170,6 +222,7 @@ class GitHubCommentThread(comments.CommentThread):
         info_dict = info.json()
         remaining = info_dict['resources'][endpoint]['remaining']
         logging.debug('Search remaining on github is at %s', remaining)
+
         if remaining <= 5:
             sleep_time = 120
         else:
