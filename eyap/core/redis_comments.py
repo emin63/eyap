@@ -67,6 +67,27 @@ class RedisCommentThread(comments.CommentThread):
 
         return comments.CommentSection(clist)
 
+    def __getstate__(self):
+        "Do not pickle redis connection"
+        return {k: v for k, v in self.__dict__.items() if k != 'redis'}
+
+    def __setstate__(self, state):
+        for key, val in state.items():
+            setattr(self, key, val)
+        self.redis = redis.Redis()
+        
+
+    @staticmethod
+    def _regr_test_pickle():
+        """
+>>> import pickle
+>>> from eyap.core import redis_comments
+>>> rc = redis_comments.RedisCommentThread(
+...     'test-owner', 'test-realm', 'test-topic', 'test-owner')
+>>> x=pickle.dumps(rc)
+>>> y=pickle.loads(x)
+"""
+
     @staticmethod
     def _regr_test():
         """
