@@ -443,7 +443,7 @@ class GitHubCommentThread(comments.CommentThread):
         return comments.CommentSection(cthread_list)
 
     def add_comment(self, body, allow_create=False, allow_hashes=True,
-                    summary=None):
+                    summary=None, hash_create=False):
         """Implement as required by CommentThread.add_comment.
 
         :arg body:    String/text of comment to add.
@@ -464,6 +464,9 @@ class GitHubCommentThread(comments.CommentThread):
         arg summary=None:        Optional summary. If not given, we will
                                  extract one from body automatically if
                                  necessary.
+
+        :arg hash_create=False:  Whether to allow creating new threads via
+                                 hash mentions.
 
         ~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
@@ -496,7 +499,7 @@ class GitHubCommentThread(comments.CommentThread):
                         result.status_code, self.topic, result.reason))
 
         if allow_hashes:
-            self.process_hashes(body)
+            self.process_hashes(body, allow_create=allow_hashes)
 
         return result
 
