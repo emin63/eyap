@@ -177,6 +177,9 @@ class CommentSection(object):
     def __str__(self):
         return self.show()
 
+    def __iter__(self):
+        return iter(self.comments)
+
 
 class CommentThread(object):
     """Abstract class used to interact with discussion threads.
