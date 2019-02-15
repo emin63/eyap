@@ -499,7 +499,7 @@ class GitHubCommentThread(comments.CommentThread):
                         result.status_code, self.topic, result.reason))
 
         if allow_hashes:
-            self.process_hashes(body, allow_create=allow_hashes)
+            self.process_hashes(body, allow_create=hash_create)
 
         return result
 
