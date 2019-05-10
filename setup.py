@@ -8,8 +8,6 @@ or write to emin.martinian@gmail.com for more information.
 from os import path
 from setuptools import setup, find_packages
 
-import eyap
-
 
 def get_readme():
     'Get the long description from the README file'
