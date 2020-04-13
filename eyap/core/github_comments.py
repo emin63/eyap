@@ -220,7 +220,12 @@ class GitHubCommentThread(comments.CommentThread):
         my_kw = {'auth': (user, token)} if user else {}
         info = requests.get('https://api.github.com/rate_limit', **my_kw)
         info_dict = info.json()
-        remaining = info_dict['resources'][endpoint]['remaining']
+        try:
+            remaining = info_dict['resources'][endpoint]['remaining']
+        except Exception as problem:  # pylint: broad-except
+            logging.error('Unable to get resources from github; got %s',
+                          str(info_dict))
+            raise
         logging.debug('Search remaining on github is at %s', remaining)
 
         if remaining <= 5:
