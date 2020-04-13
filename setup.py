@@ -20,7 +20,7 @@ def get_readme():
 
 setup(
     name='eyap',      # version is below not in eyap.__init__ since init
-    version='0.9.1',  # needs dependancies already installed for import
+    version='0.9.2',  # needs dependancies already installed for import
     description='Tools for extending yapping and comment management',
     long_description=get_readme(),
     url='http://github.com/emin63/eyap',
