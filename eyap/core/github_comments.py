@@ -427,6 +427,8 @@ class GitHubCommentThread(comments.CommentThread):
         issue_json, comment_json = self.lookup_comment_list()
         if issue_json is None and comment_json is None:
             return comments.CommentSection([])
+        if issue_json['body'] is None:
+            issue_json['body'] = ''  # None will cause problems so use ''
         cthread_list = [comments.SingleComment(
             issue_json['user']['login'], issue_json['created_at'],
             issue_json['body'], issue_json['html_url'],
