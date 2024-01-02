@@ -32,7 +32,7 @@ class RedisCommentThread(comments.CommentThread):
                 thread_id))
 
         comment = comments.SingleComment(
-            self.user, datetime.datetime.now(datetime.timezone.utc), body, 
+            self.user, datetime.datetime.now(datetime.timezone.utc), body,
             summary=summary)
         lpush = self.redis.lpush(thread_id, comment.to_json())
         logging.debug('Pushing comment to redis returned %s', str(lpush))
@@ -48,7 +48,7 @@ class RedisCommentThread(comments.CommentThread):
         return self.add_comment(body, allow_create=True)
 
     def delete_thread(self, really=False):
-        thread_id = self.lookup_thread_id()        
+        thread_id = self.lookup_thread_id()
         if not really:
             raise ValueError(
                 'Cowardly refusing to delete thread %s since really=%s' % (
@@ -67,6 +67,23 @@ class RedisCommentThread(comments.CommentThread):
 
         return comments.CommentSection(clist)
 
+    def prune_thread(self, cutoff: datetime.datetime):
+        removed = []
+        thread_id = self.lookup_thread_id()
+        while 1:
+            json_data = self.redis.lindex(thread_id, -1)  # get last item
+            if not json_data:
+                break
+            data = json.loads(json_data)
+            timestamp = datetime.datetime.strptime(
+                data['timestamp'].split('.')[0], '%Y-%m-%dT%H:%M:%S')
+            if timestamp < cutoff:  # data is older than cutoff
+                dead = self.redis.rpop(thread_id)  # removes last item
+                removed.append(dead)
+            else:  # no need to continue since thread should be sorted
+                break
+        return removed
+
     def __getstate__(self):
         "Do not pickle redis connection"
         return {k: v for k, v in self.__dict__.items() if k != 'redis'}
@@ -75,7 +92,7 @@ class RedisCommentThread(comments.CommentThread):
         for key, val in state.items():
             setattr(self, key, val)
         self.redis = redis.Redis()
-        
+
 
     @staticmethod
     def _regr_test_pickle():
@@ -106,7 +123,7 @@ Timestamp: ...
 ----------
 test_comment
         """
-    
+
 
 if __name__ == '__main__':
     doctest.testmod()

@@ -86,6 +86,8 @@ further details on usage, how to create new backends, etc.
 
 """
 
+VERSION = '0.9.6'
+
 import logging
 import doctest
 
