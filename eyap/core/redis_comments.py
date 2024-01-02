@@ -68,6 +68,7 @@ class RedisCommentThread(comments.CommentThread):
         return comments.CommentSection(clist)
 
     def prune_thread(self, cutoff: datetime.datetime):
+        removed = []
         thread_id = self.lookup_thread_id()
         while 1:
             json_data = self.redis.lindex(thread_id, -1)  # get last item
@@ -77,9 +78,11 @@ class RedisCommentThread(comments.CommentThread):
             timestamp = datetime.datetime.strptime(
                 data['timestamp'].split('.')[0], '%Y-%m-%dT%H:%M:%S')
             if timestamp < cutoff:  # data is older than cutoff
-                self.redis.rpop(thread_id, 1)  # removes last item
+                dead = self.redis.rpop(thread_id)  # removes last item
+                removed.append(dead)
             else:  # no need to continue since thread should be sorted
                 break
+        return removed
 
     def __getstate__(self):
         "Do not pickle redis connection"

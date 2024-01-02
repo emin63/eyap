@@ -7,6 +7,7 @@ or write to emin.martinian@gmail.com for more information.
 
 from os import path
 from setuptools import setup, find_packages
+from eyap import VERSION
 
 
 def get_readme():
@@ -20,7 +21,7 @@ def get_readme():
 
 setup(
     name='eyap',      # version is below not in eyap.__init__ since init
-    version='0.9.4',  # needs dependancies already installed for import
+    version=VERSION,  # needs dependancies already installed for import
     description='Tools for extending yapping and comment management',
     long_description=get_readme(),
     url='http://github.com/emin63/eyap',
