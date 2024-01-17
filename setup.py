@@ -7,7 +7,8 @@ or write to emin.martinian@gmail.com for more information.
 
 from os import path
 from setuptools import setup, find_packages
-from eyap import VERSION
+
+VERSION = '0.9.7'
 
 
 def get_readme():
